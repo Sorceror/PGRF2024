@@ -1,0 +1,4 @@
+/* backgroundSize does not work for image-right layout, hacky but works */
+.image-right + div {
+  background-size: contain !important;
+}

@@ -1,0 +1,19 @@
+{
+  "name": "pgrf2024",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "slidev build",
+    "dev": "slidev --open",
+    "export": "slidev export"
+  },
+  "dependencies": {
+    "@slidev/cli": "^0.49.1",
+    "@slidev/theme-default": "latest",
+    "vue": "^3.4.27"
+  },
+  "devDependencies": {
+    "@webgpu/types": "^0.1.40",
+    "playwright-chromium": "^1.44.0"
+  }
+}
