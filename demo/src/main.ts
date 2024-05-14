@@ -1,7 +1,10 @@
 import renderShader from "./shaders/render.wgsl?raw";
 import computeShader from "./shaders/compute.wgsl?raw";
 
-const GRID_SIZE = 32;
+const GRID_SIZE = 64;
+const UPDATE_INTERVAL = 200;
+let step = 0;
+let printStateThisFrame = false;
 
 // #region WebGPU setup
 const canvas = document.querySelector("canvas") as HTMLCanvasElement;
@@ -22,6 +25,24 @@ if (!context) {
 // #region Get and configure canvas context
 const format = navigator.gpu.getPreferredCanvasFormat();
 context.configure({ device, format });
+
+const observer = new ResizeObserver((entries) => {
+  for (const entry of entries) {
+    const canvas = entry.target as HTMLCanvasElement;
+    const width = entry.contentBoxSize[0].inlineSize;
+    const height = entry.contentBoxSize[0].blockSize;
+    canvas.width = Math.max(
+      1,
+      Math.min(width, device.limits.maxTextureDimension2D)
+    );
+    canvas.height = Math.max(
+      1,
+      Math.min(height, device.limits.maxTextureDimension2D)
+    );
+  }
+});
+observer.observe(canvas);
+
 // #endregion
 
 // #region Shader modules
@@ -64,24 +85,43 @@ const cellStateStorage = [
   device.createBuffer({
     label: "Cell State A",
     size: cellStateArray.byteLength,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    usage:
+      GPUBufferUsage.STORAGE |
+      GPUBufferUsage.COPY_DST |
+      GPUBufferUsage.COPY_SRC,
   }),
   device.createBuffer({
     label: "Cell State B",
     size: cellStateArray.byteLength,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    usage:
+      GPUBufferUsage.STORAGE |
+      GPUBufferUsage.COPY_DST |
+      GPUBufferUsage.COPY_SRC,
   }),
 ];
-// Randomize and upload initial current state
-for (let i = 0; i < cellStateArray.length; i += 3) {
-  cellStateArray[i] = Math.random() > 0.6 ? 1 : 0;
-}
-device.queue.writeBuffer(cellStateStorage[0], 0, cellStateArray);
-// Init and upload next state
-for (let i = 0; i < cellStateArray.length; i++) {
-  cellStateArray[i] = 0;
-}
-device.queue.writeBuffer(cellStateStorage[1], 0, cellStateArray);
+
+const resetState = () => {
+  // Randomize and upload initial current state
+  for (let i = 0; i < cellStateArray.length; i += 3) {
+    cellStateArray[i] = Math.random() > 0.6 ? 1 : 0;
+  }
+  device.queue.writeBuffer(cellStateStorage[0], 0, cellStateArray);
+  // Init and upload next state
+  for (let i = 0; i < cellStateArray.length; i++) {
+    cellStateArray[i] = 0;
+  }
+  device.queue.writeBuffer(cellStateStorage[1], 0, cellStateArray);
+
+  step = 0;
+};
+resetState();
+
+// Create buffer to which current state will be copied when requested
+const cellPrintState = device.createBuffer({
+  label: "Cell state print buffer",
+  size: cellStateArray.byteLength,
+  usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+});
 // #endregion
 
 // #region Create pipelines
@@ -201,11 +241,8 @@ const simulationPipeline = device.createComputePipeline({
 // #endregion
 
 // #region Run rendering/compute pass
-const UPDATE_INTERVAL = 200;
-let step = 0;
-
 // Rendering function
-function updateGrid(context: GPUCanvasContext) {
+async function updateGrid(context: GPUCanvasContext) {
   const encoder = device.createCommandEncoder();
 
   // Start compute pass
@@ -220,6 +257,17 @@ function updateGrid(context: GPUCanvasContext) {
   computePass.dispatchWorkgroups(workgroupCount, workgroupCount);
 
   computePass.end();
+
+  if (printStateThisFrame) {
+    // Copy current simulation state to intermediate buffer we can map to JS world
+    encoder.copyBufferToBuffer(
+      cellStateStorage[step % 2],
+      0,
+      cellPrintState,
+      0,
+      cellStateArray.byteLength
+    );
+  }
 
   step++;
 
@@ -242,9 +290,43 @@ function updateGrid(context: GPUCanvasContext) {
   pass.end();
 
   device.queue.submit([encoder.finish()]);
+
+  // Map state from intermediate buffer to JS world typed array and print the content
+  if (printStateThisFrame) {
+    printStateThisFrame = false;
+    await cellPrintState.mapAsync(
+      GPUMapMode.READ,
+      0,
+      cellStateArray.byteLength
+    );
+    const copyArrayBuffer = cellPrintState.getMappedRange(
+      0,
+      cellStateArray.byteLength
+    );
+    // Slice (copy) is not strictly necessary, because we don't use the array afterwards,
+    // but as soon as the `.unmap()` is called the content of the intermediate buffer
+    // is unknown (by specification, may be different across implementations / browsers)
+    const currentState = new Uint32Array(copyArrayBuffer.slice(0));
+    const stateStr = [...Array(Math.ceil(currentState.length / GRID_SIZE))]
+      .map((_, i) =>
+        currentState.slice(GRID_SIZE * i, GRID_SIZE + GRID_SIZE * i)
+      )
+      .map((ch) => ch.join("").replaceAll("0", "⬛").replaceAll("1", "🟥"))
+      .reverse()
+      .join("\n");
+    console.log(stateStr);
+    cellPrintState.unmap();
+  }
 }
 // #endregion
 
 setInterval(() => updateGrid(context), UPDATE_INTERVAL);
+
+document
+  .getElementById("resetState")
+  ?.addEventListener("click", () => resetState());
+document
+  .getElementById("printState")
+  ?.addEventListener("click", () => (printStateThisFrame = true));
 
 export {};

@@ -66,7 +66,7 @@ image: images/me.png
   - Inspired mainly by Metal & Vulkan
   - Lean into asynchronicity of the web
   - Supported by all main browsers
-- New WSGL ("wig-sil" / "wig-sal") shader language
+- New WGSL ("wig-sil" / "wig-sal") shader language
   - Similar to Rust
   - SPIR-V compilers already exists
 - Realtime rendering & GPGPU
@@ -86,7 +86,7 @@ image: images/me.png
 - Application portability by default (reasonable base limits)
 - No more canvas management hand holding ⇒ unlimited canvas count
 - Helpful error messages
-- Index is the kind
+- Index is the kind, beware of data type paddings
 - Immutable textures and buffers
 - Z Clip space [-1, 1] ⇒ [0, 1]
 
@@ -440,14 +440,17 @@ cellPrintState.unmap();
 # Resources
 
 - [Presentation & code repo @ github.com/Sorceror/PGRF2024](https://github.com/Sorceror/PGRF2024)
-<div>&nbsp;</div>
+
+<div style="line-height: 0.4em">&nbsp;</div>
 
 - [webgpufundamentals.org 😍](https://webgpufundamentals.org/)
 - [Tour of WGSL](https://google.github.io/tour-of-wgsl/)
 - [MDN WebGPU API](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API)
 - [WebGPU — All of the cores, none of the canvas](https://surma.dev/things/webgpu/)
 - [WebGPU Best Practices](https://toji.dev/webgpu-best-practices/)
+- [WebGPU offset computer and padding visualizer](https://webgpufundamentals.org/webgpu/lessons/resources/wgsl-offset-computer.html)
 - [Awesome WebGPU](https://github.com/mikbry/awesome-webgpu)
+- [WebGPU report for current device](https://webgpureport.org/)
 - [WebGPU headers](https://github.com/webgpu-native/webgpu-headers)
 - [wgpu](https://wgpu.rs/)
 - [A trip through the Graphics Pipeline 2011](https://fgiesen.wordpress.com/2011/07/09/a-trip-through-the-graphics-pipeline-2011-index/)
